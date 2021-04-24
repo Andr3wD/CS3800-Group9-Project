@@ -8,11 +8,13 @@ portDest = 9999
 selfSock = None
 running = True
 serverListenerThread = None
+inputListenerThread = None
 
 
 def main():
     global selfSock
     global serverListenerThread
+    global inputListenerThread
     # Setup socket as TCP and ipv4
     selfSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -27,18 +29,20 @@ def main():
 
 
 def inputListener():
+    global running
     while running:
         msg = input()
         send(msg)
 
 
 def serverListener():
+    global running
     global selfSock
     while running:
-        msg = selfSock.recv(8)
+        msg = selfSock.recv(2048)
         fullMsg = msg.decode("utf-8")
         while not fullMsg.find("\0"):
-            msg = selfSock.recv(8)
+            msg = selfSock.recv(2048)
             fullMsg += msg.decode("utf-8")
 
         if len(fullMsg) > 0:
@@ -49,15 +53,26 @@ def send(msg):
     # LOOKAT Always send the message?
     global selfSock
 
-    selfSock.send(bytes(msg + "\0", "utf-8"))
+    totalSent = 0
+    dataToSend = bytes(msg + "\0", "utf-8")
+    while totalSent < len(dataToSend):
+        sent = selfSock.send(dataToSend[totalSent:])
+        if sent == 0:
+            # socket closed on us.
+            print("ERR: Socket closed! Shutting down.")
+            shutDown()
+        totalSent += sent
+
     if msg == "logout()":
         shutDown()
 
 
 def shutDown():
+    global running
     running = False
+    selfSock.close()  # Close socket to server
     serverListenerThread.join()  # Stop listening to the server
-    selfSock.close()
+    # inputListenerThread.join()  # Stop listening for input
 
     print("Goodbye!")
     exit()

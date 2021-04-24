@@ -27,34 +27,43 @@ def main():
     while running:
         clientSock, clientAddr = sock.accept()
         print(f"Client {clientAddr} has connected to the server.")
+        broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
         clientSocks.append(clientSock)
         clientThread = threading.Thread(target=handleClient, args=(clientSock,))
         threads.append(clientThread)
         clientThread.start()
-        pass
 
 
 def handleClient(clientSock):
     while running:
-        msg = clientSock.recv(8)
+        msg = clientSock.recv(2048)
         fullMsg = msg.decode("utf-8")
         while not fullMsg.find("\0"):
-            msg = clientSock.recv(8)
+            msg = clientSock.recv(2048)
             fullMsg += msg.decode("utf-8")
 
         if len(fullMsg) > 0:
             print(f"{clientSock.getpeername()}: {fullMsg}")
-            if fullMsg == "logout()":
+            if fullMsg == "logout()\0":
                 broadcastMessage(f"Client {clientSock.getpeername()} has logged out.", clientSock)
+                threading.currentThread.join()
                 clientSock.close()
             else:
                 broadcastMessage(fullMsg, clientSock)
 
 
 def broadcastMessage(msg, excludeClient):
-    for x in clientSocks:
-        if x != excludeClient:
-            x.send(bytes(msg + "\0", "utf-8"))
+    for c in clientSocks:
+        if c != excludeClient:
+
+            totalSent = 0
+            dataToSend = bytes(msg + "\0", "utf-8")
+            while totalSent < len(dataToSend):
+                sent = c.send(dataToSend[totalSent:])
+                if sent == 0:
+                    # socket closed on us.
+                    print(f"ERR: Socket closed on {c.getpeername()}!")
+                totalSent += sent
 
 
 def terminalHandler():
@@ -62,12 +71,20 @@ def terminalHandler():
     while running:
         x = input()
         if x == "exit" or x == "shutdown":
-            running = False
-            for t in threads:
-                t.join()
+            shutDown()
 
-            print("Oyasumi.")
-            exit()
+
+def shutDown():
+    global running
+    running = False
+    for t in threads:
+        t.join()
+
+    for c in clientSocks:
+        c.close()
+
+    print("Oyasumi.")
+    exit()
 
 
 if __name__ == "__main__":
