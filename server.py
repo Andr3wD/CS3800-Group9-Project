@@ -1,11 +1,14 @@
 import argparse
 import socket
 import threading
+import select
+import time
 
 # TODO change defaults
-ipHost = socket.gethostname()
+ipHost = ''
 portHost = 9999
 clientCapacity = 10
+sock = None
 
 threads = []
 clientSocks = []
@@ -13,6 +16,7 @@ running = True
 
 
 def main():
+    global sock
     # Create the socket with TCP and ipv4
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind the socket to a hostID and port
@@ -20,36 +24,36 @@ def main():
     # Start listening on the socket for connections
     sock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
-    thread1 = threading.Thread(target=terminalHandler)
+    thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
 
-    # Listen
     while running:
-        clientSock, clientAddr = sock.accept()
-        print(f"Client {clientAddr} has connected to the server.")
-        broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
-        clientSocks.append(clientSock)
-        clientThread = threading.Thread(target=handleClient, args=(clientSock,))
-        threads.append(clientThread)
-        clientThread.start()
+        x = input()
+        if x.strip().lower() == "exit" or x == "shutdown":
+            shutDown()
+    
 
 
 def handleClient(clientSock):
     while running:
-        msg = clientSock.recv(2048)
-        fullMsg = msg.decode("utf-8")
-        while not fullMsg.find("\0"):
+        clientSock.setblocking(0)
+        ready = select.select([clientSock], [], [], 0.00001)
+        if ready[0]:
             msg = clientSock.recv(2048)
-            fullMsg += msg.decode("utf-8")
+            fullMsg = msg.decode("utf-8")
+            while not fullMsg.find("\0"):
+                msg = clientSock.recv(2048)
+                fullMsg += msg.decode("utf-8")
 
-        if len(fullMsg) > 0:
-            print(f"{clientSock.getpeername()}: {fullMsg}")
-            if fullMsg == "logout()\0":
-                broadcastMessage(f"Client {clientSock.getpeername()} has logged out.", clientSock)
-                threading.currentThread.join()
-                clientSock.close()
-            else:
-                broadcastMessage(fullMsg, clientSock)
+            if len(fullMsg) > 0:
+                print(f"{clientSock.getpeername()}: {fullMsg}")
+                if fullMsg.replace(" ", "") == "logout()\0":
+                    broadcastMessage(f"Client {clientSock.getpeername()} has logged out.", clientSock)
+                    clientSock.close()
+                    clientSocks.remove(clientSock)
+                    break
+                else:
+                    broadcastMessage(fullMsg, clientSock)
 
 
 def broadcastMessage(msg, excludeClient):
@@ -66,20 +70,28 @@ def broadcastMessage(msg, excludeClient):
                 totalSent += sent
 
 
-def terminalHandler():
+def listen():
     global running  # idk why this wants the global reference here...
+    global sock
+    global clientSocks
+    global threads
     while running:
-        x = input()
-        if x == "exit" or x == "shutdown":
-            shutDown()
+        ready = select.select([sock], [], [], 0.00001)
+        if ready[0]:
+            clientSock, clientAddr = sock.accept()
+            print(f"Client {clientAddr} has connected to the server.")
+            broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
+            clientSocks.append(clientSock)
+            clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
+            threads.append(clientThread)
+            clientThread.start()
 
 
 def shutDown():
     global running
     running = False
-    for t in threads:
-        t.join()
 
+    time.sleep(1) # give threads time to finish
     for c in clientSocks:
         c.close()
 
