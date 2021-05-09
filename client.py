@@ -4,11 +4,13 @@ import threading
 
 # TODO change defaults
 ipDest = socket.gethostname()
-portDest = 9999
+portDest = 5050
 selfSock = None
 running = True
 serverListenerThread = None
 inputListenerThread = None
+FORMAT = "utf-8"
+bufferSize = 2048
 
 
 def main():
@@ -39,11 +41,11 @@ def serverListener():
     global running
     global selfSock
     while running:
-        msg = selfSock.recv(2048)
-        fullMsg = msg.decode("utf-8")
+        msg = selfSock.recv(bufferSize)
+        fullMsg = msg.decode(FORMAT)
         while not fullMsg.find("\0"):
-            msg = selfSock.recv(2048)
-            fullMsg += msg.decode("utf-8")
+            msg = selfSock.recv(bufferSize)
+            fullMsg += msg.decode(FORMAT)
 
         if len(fullMsg) > 0:
             print(fullMsg)
@@ -54,7 +56,7 @@ def send(msg):
     global selfSock
 
     totalSent = 0
-    dataToSend = bytes(msg + "\0", "utf-8")
+    dataToSend = bytes(msg + "\0", FORMAT)
     while totalSent < len(dataToSend):
         sent = selfSock.send(dataToSend[totalSent:])
         if sent == 0:
