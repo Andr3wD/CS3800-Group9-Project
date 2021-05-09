@@ -1,6 +1,8 @@
 import argparse
 import socket
 import threading
+import select
+import time
 
 # TODO change defaults
 ipHost = socket.gethostname()
@@ -14,6 +16,7 @@ running = True
 
 
 def main():
+    global sock
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind the socket to a hostID and port
@@ -22,10 +25,9 @@ def main():
     print("listening to port", portHost, " on ", ipHost)
     serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
-    thread1 = threading.Thread(target=terminalHandler)
+    thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
 
-    # Listen
     while running:
         clientSock, clientAddr = serverSock.accept()
         # Speak to server
@@ -43,21 +45,23 @@ def removeFromClientSocksList(clientSock):
 
 def handleClient(clientSock):
     while running:
-
-        msg = clientSock.recv(bufferSize)
-        fullMsg = msg.decode(FORMAT)
-
-        while not fullMsg.find("\0"):
+        clientSock.setblocking(0)
+        ready = select.select([clientSock], [], [], 0.00001)
+        if ready[0]:
             msg = clientSock.recv(bufferSize)
-            fullMsg += msg.decode(FORMAT)
+            fullMsg = msg.decode(FORMAT)
+            while not fullMsg.find("\0"):
+                msg = clientSock.recv(bufferSize)
+                fullMsg += msg.decode(FORMAT)
+        
 
         if len(fullMsg) > 0:
             print(f"{clientSock.getpeername()}: {fullMsg}")
             if fullMsg == "logout()\0":
                 broadcastMessage(f"Client {clientSock.getpeername()} has logged out. We have {len(clientSocks)} client in the room", clientSock)
-                threading.currentThread.join()
                 clientSock.close()
-                removeFromClientSocksList(clientSock)
+                clientSocks.remove(clientSock)
+                break
             else:
                 broadcastMessage(fullMsg, clientSock)
 
@@ -76,20 +80,27 @@ def broadcastMessage(msg, excludeClient):
                     print(f"ERR: Socket closed on {c.getpeername()}!")
                 totalSent += sent
 
-def terminalHandler():
+def listen():
     global running  # idk why this wants the global reference here...
+    global clientSocks
+    global threads
     while running:
-        x = input()
-        if x == "exit" or x == "shutdown":
-            shutDown()
+        ready = select.select([serverSock], [], [], 0.00001)
+        if ready[0]:
+            clientSock, clientAddr = serverSock.accept()
+            print(f"Client {clientAddr} has connected to the server.")
+            broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
+            clientSocks.append(clientSock)
+            clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
+            threads.append(clientThread)
+            clientThread.start()
 
 
 def shutDown():
     global running
     running = False
-    for t in threads:
-        t.join()
 
+    time.sleep(1) # give threads time to finish
     for c in clientSocks:
         c.close()
 

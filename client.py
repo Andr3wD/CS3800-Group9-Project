@@ -1,6 +1,8 @@
 import argparse
 import socket
 import threading
+import select
+import time
 
 # TODO change defaults
 ipDest = socket.gethostname()
@@ -23,15 +25,9 @@ def main():
     # Connect to the server
     selfSock.connect((ipDest, portDest))
 
-    inputListenerThread = threading.Thread(target=inputListener)
-    inputListenerThread.start()
-
-    serverListenerThread = threading.Thread(target=serverListener)
+    serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()
 
-
-def inputListener():
-    global running
     while running:
         msg = input()
         send(msg)
@@ -40,16 +36,21 @@ def inputListener():
 def serverListener():
     global running
     global selfSock
+    global end
     while running:
-        msg = selfSock.recv(bufferSize)
-        fullMsg = msg.decode(FORMAT)
-        while not fullMsg.find("\0"):
+        selfSock.setblocking(0)
+        ready = select.select([selfSock], [], [], 0.00001)
+        if ready[0]:
             msg = selfSock.recv(bufferSize)
-            fullMsg += msg.decode(FORMAT)
+            fullMsg = msg.decode(FORMAT)
+            while not fullMsg.find("\0"):
+                msg = selfSock.recv(bufferSize)
+                fullMsg += msg.decode(FORMAT)
 
-        if len(fullMsg) > 0:
-            print(fullMsg)
-
+            if len(fullMsg) > 0:
+                print(fullMsg)
+    
+    end = True
 
 def send(msg):
     # LOOKAT Always send the message?
@@ -64,18 +65,23 @@ def send(msg):
             print("ERR: Socket closed! Shutting down.")
             shutDown()
         totalSent += sent
-
-    if msg == "logout()":
+        
+    if msg.strip().lower() == "logout()":
         shutDown()
 
 
 def shutDown():
     global running
+    global selfSock
+    global end
     running = False
-    selfSock.close()  # Close socket to server
-    serverListenerThread.join()  # Stop listening to the server
-    # inputListenerThread.join()  # Stop listening for input
+    
+    while True: # give threads time to finish
+        if end:
+            break 
 
+    selfSock.close()  # Close socket to server 
+    
     print("Goodbye!")
     exit()
 
