@@ -13,6 +13,7 @@ serverListenerThread = None
 inputListenerThread = None
 FORMAT = "utf-8"
 bufferSize = 2048
+end = False
 
 
 def main():
@@ -28,10 +29,9 @@ def main():
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()
 
-    while running:
+    while (running):
         msg = input()
         send(msg)
-
 
 def serverListener():
     global running

@@ -3,6 +3,7 @@ import socket
 import threading
 import select
 import time
+from queue import Queue
 
 # TODO change defaults
 ipHost = socket.gethostname()
@@ -11,12 +12,13 @@ clientCapacity = 10
 FORMAT = "utf-8"
 threads = []
 clientSocks = []
+messageDatabaseQueue = Queue(maxsize = 50)
 bufferSize = 2048
 running = True
 
 
 def main():
-    global sock
+    global serverSock
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind the socket to a hostID and port
@@ -29,14 +31,9 @@ def main():
     thread1.start()
 
     while running:
-        clientSock, clientAddr = serverSock.accept()
-        # Speak to server
-        print(f"Client {clientAddr} has connected to the server. We have {len(clientSocks) + 1} client in the room")
-        broadcastMessage(f"Client {clientAddr} has connected to the server. We have {len(clientSocks) + 1} client in the room", clientSock)
-        clientSocks.append(clientSock)
-        clientThread = threading.Thread(target=handleClient, args=(clientSock,))
-        threads.append(clientThread)
-        clientThread.start()
+        x = input()
+        if x.strip().lower() == "exit" or x == "shutdown":
+            shutDown()
 
 
 def removeFromClientSocksList(clientSock):
@@ -53,21 +50,22 @@ def handleClient(clientSock):
             while not fullMsg.find("\0"):
                 msg = clientSock.recv(bufferSize)
                 fullMsg += msg.decode(FORMAT)
-        
-
-        if len(fullMsg) > 0:
-            print(f"{clientSock.getpeername()}: {fullMsg}")
-            if fullMsg == "logout()\0":
-                broadcastMessage(f"Client {clientSock.getpeername()} has logged out. We have {len(clientSocks)} client in the room", clientSock)
-                clientSock.close()
-                clientSocks.remove(clientSock)
-                break
-            else:
-                broadcastMessage(fullMsg, clientSock)
+            if len(fullMsg) > 0:
+                print(f"User {clientSocks.index(clientSock)} said: {fullMsg}")
+                if fullMsg == "logout()\0":
+                    broadcastMessage(f"User {clientSocks.index(clientSock) + 1} has logged out. We have {len(clientSocks) -1} client in the room", clientSock)
+                    clientSocks.remove(clientSock)
+                    clientSock.close()
+                    break
+                else:
+                    fullMsg = "User " + str(clientSocks.index(clientSock) + 1) + ": " + fullMsg
+                    broadcastMessage(fullMsg, clientSock)
 
 
 def broadcastMessage(msg, excludeClient):
-
+    global messageDatabaseQueue
+    global clientSocks
+    dataToSend = ""
     #Speak to Client
     for c in clientSocks:
         if c != excludeClient:
@@ -79,22 +77,34 @@ def broadcastMessage(msg, excludeClient):
                     # socket closed on us.
                     print(f"ERR: Socket closed on {c.getpeername()}!")
                 totalSent += sent
+    if messageDatabaseQueue.full():
+        messageDatabaseQueue.get()
+    messageDatabaseQueue.put(msg)  # Saving to message database
+
 
 def listen():
     global running  # idk why this wants the global reference here...
     global clientSocks
+    global serverSock
     global threads
     while running:
         ready = select.select([serverSock], [], [], 0.00001)
         if ready[0]:
             clientSock, clientAddr = serverSock.accept()
-            print(f"Client {clientAddr} has connected to the server.")
-            broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
             clientSocks.append(clientSock)
+            print(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks) } client in the room")
+            broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
+            print(f"Update User {clientSocks.index(clientSock) + 1} all previous messages based on message database. We have {sendFullDatabase(clientSock)} messages")
             clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
             threads.append(clientThread)
             clientThread.start()
 
+def sendFullDatabase(sock):
+    for index,message in enumerate(messageDatabaseQueue.queue):
+        sock.send(bytes(message, FORMAT))
+        if index < len(messageDatabaseQueue.queue)-1:
+            sock.send(bytes("\n", FORMAT))
+    return len(messageDatabaseQueue.queue)
 
 def shutDown():
     global running
