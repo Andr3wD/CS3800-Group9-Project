@@ -1,9 +1,11 @@
 import argparse
 import socket
+import ssl
 import threading
 import select
 import time
 from queue import Queue
+from Crypto.Cipher import AES
 
 # TODO change defaults
 ipHost =  socket.gethostname() #'AWSaddy' 52.53.221.224
@@ -119,6 +121,11 @@ def shutDown():
 
     print("Oyasumi.")
     exit()
+
+def do_encrypt(message):
+    obj = AES.new('This is a key123', AES.MODE_CBC, 'This is an IV456')
+    ciphertext = obj.encrypt(message)
+    return ciphertext
 
 
 if __name__ == "__main__":

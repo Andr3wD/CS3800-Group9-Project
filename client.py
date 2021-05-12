@@ -1,5 +1,6 @@
 import argparse
 import socket
+import ssl
 import threading
 import select
 import time
@@ -20,31 +21,36 @@ def main():
     global selfSock
     global serverListenerThread
     global inputListenerThread
+    global wrappedSocket
     # Setup socket as TCP and ipv4
     selfSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    wrappedSocket = ssl.wrap_socket(selfSock, cert_reqs=ssl.CERT_NONE)
 
     # Connect to the server
-    selfSock.connect((ipDest, portDest))
+    wrappedSocket.connect((ipDest, portDest))
 
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()
 
     while (running):
         msg = input()
-        send(msg)
+        if len(msg) >= 2048:
+            print('Please limit your message to less than 2048 characters')
+        else:
+            send(msg)
 
 def serverListener():
     global running
-    global selfSock
+    global wrappedSocket
     global end
     while running:
-        selfSock.setblocking(0)
-        ready = select.select([selfSock], [], [], 0.00001)
+        wrappedSocket.setblocking(0)
+        ready = select.select([wrappedSocket], [], [], 0.00001)
         if ready[0]:
-            msg = selfSock.recv(bufferSize)
+            msg = wrappedSocket.recv(bufferSize)
             fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
-                msg = selfSock.recv(bufferSize)
+                msg = wrappedSocket.recv(bufferSize)
                 fullMsg += msg.decode(FORMAT)
 
             if len(fullMsg) > 0:
@@ -54,12 +60,12 @@ def serverListener():
 
 def send(msg):
     # LOOKAT Always send the message?
-    global selfSock
+    global wrappedSocket
 
     totalSent = 0
     dataToSend = bytes(msg + "\0", FORMAT)
     while totalSent < len(dataToSend):
-        sent = selfSock.send(dataToSend[totalSent:])
+        sent = wrappedSocket.send(dataToSend[totalSent:])
         if sent == 0:
             # socket closed on us.
             print("ERR: Socket closed! Shutting down.")
@@ -72,7 +78,7 @@ def send(msg):
 
 def shutDown():
     global running
-    global selfSock
+    global wrappedSocket
     global end
     running = False
     
@@ -80,7 +86,7 @@ def shutDown():
         if end:
             break 
 
-    selfSock.close()  # Close socket to server 
+    wrappedSocket.close()  # Close socket to server 
     
     print("Goodbye!")
     exit()
