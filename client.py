@@ -5,8 +5,8 @@ import select
 import time
 
 # TODO change defaults
-ipDest = socket.gethostname()
-portDest = 5050
+ipDest = socket.gethostname() #'AWS' 52.53.221.224
+portDest = 9999
 selfSock = None
 running = True
 serverListenerThread = None
@@ -66,7 +66,7 @@ def send(msg):
             shutDown()
         totalSent += sent
         
-    if msg.strip().lower() == "logout()":
+    if msg.strip().lower().replace(" ","") == "logout()":
         shutDown()
 
 

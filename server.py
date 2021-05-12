@@ -6,8 +6,8 @@ import time
 from queue import Queue
 
 # TODO change defaults
-ipHost = socket.gethostname()
-portHost = 5050
+ipHost =  socket.gethostname() #'AWSaddy' 52.53.221.224
+portHost = 9999
 clientCapacity = 10
 FORMAT = "utf-8"
 threads = []
@@ -15,10 +15,13 @@ clientSocks = []
 messageDatabaseQueue = Queue(maxsize = 50)
 bufferSize = 2048
 running = True
+serverSock = None
 
 
 def main():
     global serverSock
+    global ipHost
+    global portHost
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind the socket to a hostID and port
@@ -52,7 +55,7 @@ def handleClient(clientSock):
                 fullMsg += msg.decode(FORMAT)
             if len(fullMsg) > 0:
                 print(f"User {clientSocks.index(clientSock)} said: {fullMsg}")
-                if fullMsg == "logout()\0":
+                if fullMsg.replace(" ","") == "logout()\0":
                     broadcastMessage(f"User {clientSocks.index(clientSock) + 1} has logged out. We have {len(clientSocks) -1} client in the room", clientSock)
                     clientSocks.remove(clientSock)
                     clientSock.close()
