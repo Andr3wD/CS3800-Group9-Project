@@ -5,12 +5,14 @@ import select
 import time
 
 # TODO change defaults
-ipDest = 'localhost' #52.53.221.224
+ipDest = socket.gethostname() #'AWS' 52.53.221.224
 portDest = 9999
 selfSock = None
 running = True
 serverListenerThread = None
 inputListenerThread = None
+FORMAT = "utf-8"
+bufferSize = 2048
 end = False
 
 
@@ -27,10 +29,9 @@ def main():
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()
 
-    while running:
+    while (running):
         msg = input()
         send(msg)
-
 
 def serverListener():
     global running
@@ -40,11 +41,11 @@ def serverListener():
         selfSock.setblocking(0)
         ready = select.select([selfSock], [], [], 0.00001)
         if ready[0]:
-            msg = selfSock.recv(2048)
-            fullMsg = msg.decode("utf-8")
+            msg = selfSock.recv(bufferSize)
+            fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
-                msg = selfSock.recv(2048)
-                fullMsg += msg.decode("utf-8")
+                msg = selfSock.recv(bufferSize)
+                fullMsg += msg.decode(FORMAT)
 
             if len(fullMsg) > 0:
                 print(fullMsg)
@@ -56,7 +57,7 @@ def send(msg):
     global selfSock
 
     totalSent = 0
-    dataToSend = bytes(msg + "\0", "utf-8")
+    dataToSend = bytes(msg + "\0", FORMAT)
     while totalSent < len(dataToSend):
         sent = selfSock.send(dataToSend[totalSent:])
         if sent == 0:
@@ -65,7 +66,7 @@ def send(msg):
             shutDown()
         totalSent += sent
         
-    if msg.strip().lower() == "logout()":
+    if msg.strip().lower().replace(" ","") == "logout()":
         shutDown()
 
 

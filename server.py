@@ -3,26 +3,32 @@ import socket
 import threading
 import select
 import time
+from queue import Queue
 
 # TODO change defaults
-ipHost = ''
+ipHost =  socket.gethostname() #'AWSaddy' 52.53.221.224
 portHost = 9999
 clientCapacity = 10
-sock = None
-
+FORMAT = "utf-8"
 threads = []
 clientSocks = []
+messageDatabaseQueue = Queue(maxsize = 50)
+bufferSize = 2048
 running = True
+serverSock = None
 
 
 def main():
-    global sock
+    global serverSock
+    global ipHost
+    global portHost
     # Create the socket with TCP and ipv4
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # Bind the socket to a hostID and port
-    sock.bind((ipHost, portHost))
+    serverSock.bind((ipHost, portHost))
     # Start listening on the socket for connections
-    sock.listen(clientCapacity)  # who knows. they could all connect at the same time?
+    print("listening to port", portHost, " on ", ipHost)
+    serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
     thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
@@ -31,7 +37,10 @@ def main():
         x = input()
         if x.strip().lower() == "exit" or x == "shutdown":
             shutDown()
-    
+
+
+def removeFromClientSocksList(clientSock):
+    clientSocks.remove(clientSock)
 
 
 def handleClient(clientSock):
@@ -39,53 +48,66 @@ def handleClient(clientSock):
         clientSock.setblocking(0)
         ready = select.select([clientSock], [], [], 0.00001)
         if ready[0]:
-            msg = clientSock.recv(2048)
-            fullMsg = msg.decode("utf-8")
+            msg = clientSock.recv(bufferSize)
+            fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
-                msg = clientSock.recv(2048)
-                fullMsg += msg.decode("utf-8")
-
+                msg = clientSock.recv(bufferSize)
+                fullMsg += msg.decode(FORMAT)
             if len(fullMsg) > 0:
-                print(f"{clientSock.getpeername()}: {fullMsg}")
-                if fullMsg.replace(" ", "") == "logout()\0":
-                    broadcastMessage(f"Client {clientSock.getpeername()} has logged out.", clientSock)
-                    clientSock.close()
+                print(f"User {clientSocks.index(clientSock)} said: {fullMsg}")
+                if fullMsg.replace(" ","") == "logout()\0":
+                    broadcastMessage(f"User {clientSocks.index(clientSock) + 1} has logged out. We have {len(clientSocks) -1} client in the room", clientSock)
                     clientSocks.remove(clientSock)
+                    clientSock.close()
                     break
                 else:
+                    fullMsg = "User " + str(clientSocks.index(clientSock) + 1) + ": " + fullMsg
                     broadcastMessage(fullMsg, clientSock)
 
 
 def broadcastMessage(msg, excludeClient):
+    global messageDatabaseQueue
+    global clientSocks
+    dataToSend = ""
+    #Speak to Client
     for c in clientSocks:
         if c != excludeClient:
-
             totalSent = 0
-            dataToSend = bytes(msg + "\0", "utf-8")
+            dataToSend = bytes(msg + "\0", FORMAT)
             while totalSent < len(dataToSend):
                 sent = c.send(dataToSend[totalSent:])
                 if sent == 0:
                     # socket closed on us.
                     print(f"ERR: Socket closed on {c.getpeername()}!")
                 totalSent += sent
+    if messageDatabaseQueue.full():
+        messageDatabaseQueue.get()
+    messageDatabaseQueue.put(msg)  # Saving to message database
 
 
 def listen():
     global running  # idk why this wants the global reference here...
-    global sock
     global clientSocks
+    global serverSock
     global threads
     while running:
-        ready = select.select([sock], [], [], 0.00001)
+        ready = select.select([serverSock], [], [], 0.00001)
         if ready[0]:
-            clientSock, clientAddr = sock.accept()
-            print(f"Client {clientAddr} has connected to the server.")
-            broadcastMessage(f"Client {clientAddr} has connected to the server.", clientSock)
+            clientSock, clientAddr = serverSock.accept()
             clientSocks.append(clientSock)
+            print(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks) } client in the room")
+            broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
+            print(f"Update User {clientSocks.index(clientSock) + 1} all previous messages based on message database. We have {sendFullDatabase(clientSock)} messages")
             clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
             threads.append(clientThread)
             clientThread.start()
 
+def sendFullDatabase(sock):
+    for index,message in enumerate(messageDatabaseQueue.queue):
+        sock.send(bytes(message, FORMAT))
+        if index < len(messageDatabaseQueue.queue)-1:
+            sock.send(bytes("\n", FORMAT))
+    return len(messageDatabaseQueue.queue)
 
 def shutDown():
     global running
