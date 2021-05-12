@@ -22,15 +22,17 @@ serverSock = None
 
 def main():
     global serverSock
+    global wrappedServerSock
     global ipHost
     global portHost
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    wrappedServerSock = ssl.wrap_socket(serverSock, cert_reqs=ssl.CERT_NONE)
     # Bind the socket to a hostID and port
-    serverSock.bind((ipHost, portHost))
+    wrappedServerSock.bind((ipHost, portHost))
     # Start listening on the socket for connections
     print("listening to port", portHost, " on ", ipHost)
-    serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
+    wrappedServerSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
     thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
@@ -90,12 +92,12 @@ def broadcastMessage(msg, excludeClient):
 def listen():
     global running  # idk why this wants the global reference here...
     global clientSocks
-    global serverSock
+    global wrappedServerSock
     global threads
     while running:
-        ready = select.select([serverSock], [], [], 0.00001)
+        ready = select.select([wrappedServerSock], [], [], 0.00001)
         if ready[0]:
-            clientSock, clientAddr = serverSock.accept()
+            clientSock, clientAddr = wrappedServerSock.accept()
             clientSocks.append(clientSock)
             print(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks) } client in the room")
             broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
