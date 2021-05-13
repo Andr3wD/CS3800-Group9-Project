@@ -24,10 +24,12 @@ def main():
     global wrappedSocket
     # Setup socket as TCP and ipv4
     selfSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    wrappedSocket = ssl.wrap_socket(selfSock, cert_reqs=ssl.CERT_NONE)
+    wrappedSocket = ssl.wrap_socket(selfSock, certfile="./KEYS/client.public.pem", keyfile="./KEYS/client.private.key")
 
     # Connect to the server
     wrappedSocket.connect((ipDest, portDest))
+    
+    print(f"Connected to {ipDest}, {wrappedSocket.getpeername()}")
 
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()

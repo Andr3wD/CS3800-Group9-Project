@@ -27,11 +27,11 @@ def main():
     global portHost
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    wrappedServerSock = ssl.wrap_socket(serverSock, cert_reqs=ssl.CERT_NONE)
+    wrappedServerSock = ssl.wrap_socket(serverSock, server_side=True, certfile="./KEYS/server.public.pem", keyfile="./KEYS/server.private.key")
     # Bind the socket to a hostID and port
     wrappedServerSock.bind((ipHost, portHost))
     # Start listening on the socket for connections
-    print("listening to port", portHost, " on ", ipHost)
+    print("listening to port", portHost, " on ", ipHost, " using IP: ", socket.gethostbyname(ipHost))
     wrappedServerSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
     thread1 = threading.Thread(target=listen, daemon=True)
@@ -99,7 +99,7 @@ def listen():
         if ready[0]:
             clientSock, clientAddr = wrappedServerSock.accept()
             clientSocks.append(clientSock)
-            print(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks) } client in the room")
+            print(f"User {clientSocks.index(clientSock)+1} has connected to the server from {clientAddr}. We have {len(clientSocks) } client in the room")
             broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
             print(f"Update User {clientSocks.index(clientSock) + 1} all previous messages based on message database. We have {sendFullDatabase(clientSock)} messages")
             clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
