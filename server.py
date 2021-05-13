@@ -18,21 +18,28 @@ messageDatabaseQueue = Queue(maxsize = 50)
 bufferSize = 2048
 running = True
 serverSock = None
-
+sslContext = None
 
 def main():
+    global sslContext
     global serverSock
-    global wrappedServerSock
     global ipHost
     global portHost
+    
+    # TODO comment
+    sslContext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    sslContext.load_cert_chain(certfile="./KEYS/server.public.pem", keyfile="./KEYS/server.private.key")
+    
+    
     # Create the socket with TCP and ipv4
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    wrappedServerSock = ssl.wrap_socket(serverSock, server_side=True, certfile="./KEYS/server.public.pem", keyfile="./KEYS/server.private.key")
+    
     # Bind the socket to a hostID and port
-    wrappedServerSock.bind((ipHost, portHost))
+    serverSock.bind((ipHost, portHost))
+    
     # Start listening on the socket for connections
     print("listening to port", portHost, " on ", ipHost, " using IP: ", socket.gethostbyname(ipHost))
-    wrappedServerSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
+    serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
     thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
@@ -92,12 +99,17 @@ def broadcastMessage(msg, excludeClient):
 def listen():
     global running  # idk why this wants the global reference here...
     global clientSocks
-    global wrappedServerSock
+    global serverSock
     global threads
+    global sslContext
+    
     while running:
-        ready = select.select([wrappedServerSock], [], [], 0.00001)
+        ready = select.select([serverSock], [], [], 0.00001)
         if ready[0]:
-            clientSock, clientAddr = wrappedServerSock.accept()
+            clientSockUnwrapped, clientAddr = serverSock.accept()
+            # No clue why it has to be this way, Python docs just want it wrapped after. https://docs.python.org/3/library/ssl.html#server-side-operation
+            clientSock = sslContext.wrap_socket(clientSockUnwrapped, server_side=True)
+            
             clientSocks.append(clientSock)
             print(f"User {clientSocks.index(clientSock)+1} has connected to the server from {clientAddr}. We have {len(clientSocks) } client in the room")
             broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
