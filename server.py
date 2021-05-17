@@ -5,7 +5,6 @@ import threading
 import select
 import time
 from queue import Queue
-from Crypto.Cipher import AES
 
 # TODO change defaults
 ipHost =  socket.gethostname() #'AWSaddy' 52.53.221.224
@@ -14,6 +13,7 @@ clientCapacity = 10
 FORMAT = "utf-8"
 threads = []
 clientSocks = []
+names = {}
 messageDatabaseQueue = Queue(maxsize = 50)
 bufferSize = 2048
 running = True
@@ -54,7 +54,12 @@ def removeFromClientSocksList(clientSock):
     clientSocks.remove(clientSock)
 
 
-def handleClient(clientSock):
+def handleClient(clientSock, clientAddr):
+    global names
+    names[clientSock] = createName(clientSock)
+    print(f"{names[clientSock]} has connected to the server from {clientAddr}. We have {len(names) } client in the room")
+    broadcastMessage(f"{names[clientSock]} has connected to the server. We have {len(names)} client in the room",clientSock)
+    print(f"Update {names[clientSock]} all previous messages based on message database. We have {sendFullDatabase(clientSock)} messages")
     while running:
         clientSock.setblocking(0)
         ready = select.select([clientSock], [], [], 0.00001)
@@ -65,23 +70,23 @@ def handleClient(clientSock):
                 msg = clientSock.recv(bufferSize)
                 fullMsg += msg.decode(FORMAT)
             if len(fullMsg) > 0:
-                print(f"User {clientSocks.index(clientSock)} said: {fullMsg}")
+                print(f"{names[clientSock]} said: {fullMsg}")
                 if fullMsg.replace(" ","") == "logout()\0":
-                    broadcastMessage(f"User {clientSocks.index(clientSock) + 1} has logged out. We have {len(clientSocks) -1} client in the room", clientSock)
+                    broadcastMessage(f"{names.pop(clientSock)} has logged out. We have {len(clientSocks) -1} client in the room", clientSock)
                     clientSocks.remove(clientSock)
                     clientSock.close()
                     break
                 else:
-                    fullMsg = "User " + str(clientSocks.index(clientSock) + 1) + ": " + fullMsg
+                    fullMsg = names[clientSock] + ": " + fullMsg
                     broadcastMessage(fullMsg, clientSock)
 
 
 def broadcastMessage(msg, excludeClient):
     global messageDatabaseQueue
-    global clientSocks
+    global names
     dataToSend = ""
     #Speak to Client
-    for c in clientSocks:
+    for c in names.keys():
         if c != excludeClient:
             totalSent = 0
             dataToSend = bytes(msg + "\0", FORMAT)
@@ -102,6 +107,7 @@ def listen():
     global serverSock
     global threads
     global sslContext
+    global names
     
     while running:
         ready = select.select([serverSock], [], [], 0.00001)
@@ -111,12 +117,17 @@ def listen():
             clientSock = sslContext.wrap_socket(clientSockUnwrapped, server_side=True)
             
             clientSocks.append(clientSock)
-            print(f"User {clientSocks.index(clientSock)+1} has connected to the server from {clientAddr}. We have {len(clientSocks) } client in the room")
-            broadcastMessage(f"User {clientSocks.index(clientSock)+1} has connected to the server. We have {len(clientSocks)} client in the room",clientSock)
-            print(f"Update User {clientSocks.index(clientSock) + 1} all previous messages based on message database. We have {sendFullDatabase(clientSock)} messages")
-            clientThread = threading.Thread(target=handleClient, args=(clientSock,), daemon=True)
+            
+            clientThread = threading.Thread(target=handleClient, args=(clientSock, clientAddr), daemon=True)
             threads.append(clientThread)
             clientThread.start()
+
+def createName(clientSock):
+    global names
+    clientSock.send(bytes("Input Username: " + "\0", FORMAT))
+    name = clientSock.recv(bufferSize)
+    return name.decode(FORMAT)
+
 
 def sendFullDatabase(sock):
     for index,message in enumerate(messageDatabaseQueue.queue):
@@ -135,11 +146,6 @@ def shutDown():
 
     print("Oyasumi.")
     exit()
-
-def do_encrypt(message):
-    obj = AES.new('This is a key123', AES.MODE_CBC, 'This is an IV456')
-    ciphertext = obj.encrypt(message)
-    return ciphertext
 
 
 if __name__ == "__main__":
