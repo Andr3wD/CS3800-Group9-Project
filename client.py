@@ -4,9 +4,10 @@ import ssl
 import threading
 import select
 import time
+from colorama import Fore
 
 # TODO change defaults
-ipDest = socket.gethostname() #'AWS' 52.53.221.224
+ipDest = socket.gethostname()  # 'AWS' 52.53.221.224
 portDest = 9999
 selfSock = None
 running = True
@@ -14,60 +15,76 @@ serverListenerThread = None
 inputListenerThread = None
 FORMAT = "utf-8"
 bufferSize = 2048
-end = False
 
 
 def main():
     global selfSock
     global serverListenerThread
     global inputListenerThread
-    
-    
+
     # Make SSL Context depending if we're running from server or not.
     sslContext = None
     if ipDest != socket.gethostname():
-        print("Recognized that client is attempting connection with outside server.")
+        print(f"{Fore.YELLOW}Recognized that client is attempting connection with outside server.{Fore.RESET}")
         sslContext = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)  # PROTOCOL_TLS_CLIENT automatically sets CERT_REQUIRED and check_hostname
         sslContext.load_verify_locations(cafile="./KEYS/server.public.pem")
     else:
         # THIS IS ONLY FOR TESTING!
-        print("Client only connecting to self. Ignoring cert validations.")
+        print(f"{Fore.RED}Client only connecting to self. Ignoring cert validations.{Fore.RESET}")
         sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)  # Don't want to check hostname, since cert won't match right now.
-    
+
     # Probably just remove. client doesn't need cert.
     # sslContext.load_cert_chain(certfile="./KEYS/client.public.pem", keyfile="./KEYS/client.private.key")
-    
+
     # Setup socket as ipv4 and TCP.
     selfUnwrappedSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
+
     # Wrap socket in SSL context.
     selfSock = sslContext.wrap_socket(selfUnwrappedSock, server_hostname=ipDest)
 
     # Connect to the server
     selfSock.connect((ipDest, portDest))
-    
+
+    print(selfSock.getpeercert())
+
     print(f"Connected to {ipDest}, {selfSock.getpeername()}")
+
+    # Get and pring cipher details
+    ciph = selfSock.cipher()
+    if ciph[1] == "TLSv1.2" or ciph[1] == "TLSv1.3":
+        print(f"Using cipher: {ciph[0]}, {Fore.GREEN}Protocol: {ciph[1]}{Fore.RESET}, #Secrets: {ciph[2]}.")
 
     # Start the serverListener method on a new thread.
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
     serverListenerThread.start()
 
     while (running):
-        msg = input()
+        try:
+            msg = input()
+        except:
+            print(f"{Fore.RED}Forcing shutdown!{Fore.RESET}")
+            selfSock.shutdown(socket.SHUT_RD)
+            exit()
+
         if len(msg) >= 2048:
             print('Please limit your message to less than 2048 characters')
         else:
             send(msg)
 
+
 def serverListener():
     global running
     global selfSock
-    global end
     while running:
         selfSock.setblocking(0)
         ready = select.select([selfSock], [], [], 0.00001)
         if ready[0]:
-            msg = selfSock.recv(bufferSize)
+            try:
+                msg = selfSock.recv(bufferSize)
+            except:
+                selfSock.close()
+                exit()
+                
             fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
                 msg = selfSock.recv(bufferSize)
@@ -75,17 +92,19 @@ def serverListener():
 
             if len(fullMsg) > 0:
                 print(fullMsg)
-    
-    end = True
+
 
 def send(msg):
-    # LOOKAT Always send the message?
     global selfSock
 
     totalSent = 0
     dataToSend = bytes(msg + "\0", FORMAT)
     while totalSent < len(dataToSend):
-        sent = selfSock.send(dataToSend[totalSent:])
+        try:
+            sent = selfSock.send(dataToSend[totalSent:])
+        except:
+            exit()
+            
         if sent == 0:
             # socket closed on us.
             print("ERR: Socket closed! Shutting down.")
@@ -99,13 +118,8 @@ def send(msg):
 def shutDown():
     global running
     global selfSock
-    global end
     running = False
     
-    while True: # give threads time to finish
-        if end:
-            break 
-
     selfSock.close()  # Close socket to server
     
     print("Goodbye!")
