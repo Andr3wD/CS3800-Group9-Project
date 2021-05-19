@@ -8,7 +8,7 @@ from queue import Queue
 from colorama import Fore
 
 # TODO change defaults
-ipHost = socket.gethostname()  # 'AWSaddy' 52.53.221.224
+ipHost = socket.gethostname()
 portHost = 9999
 clientCapacity = 10
 FORMAT = "utf-8"
@@ -81,7 +81,7 @@ def handleClient(clientSock, clientAddr):
                 msg = clientSock.recv(bufferSize)
 
             except:
-                print(f"{Fore.RED}Client: {clientSock.getpeername()} has closed their socket abruptly.{Fore.RESET}")
+                print(f"{Fore.RED}Client: {clientAddr} has closed their socket abruptly.{Fore.RESET}")
                 broadcastMessage(f"{Fore.YELLOW}{names.pop(clientSock)}{Fore.RESET} has been disconnected. We have {len(clientSocks)-1} client(s) in the room.", clientSock)
                 handleClientDisconnect(clientSock)
 
@@ -165,7 +165,10 @@ def createName(clientSock):
 
 def sendFullDatabase(sock):
     for index, message in enumerate(messageDatabaseQueue.queue):
-        sock.send(bytes(message, FORMAT))
+        ret = sock.sendall(bytes(message, FORMAT))
+        if ret != None:
+            print(f"{Fore.RED}Problem sending all of message database index: {index} to client!{Fore.RESET}")
+            print(f"Problematic message: {message}")
     return len(messageDatabaseQueue.queue)
 
 
