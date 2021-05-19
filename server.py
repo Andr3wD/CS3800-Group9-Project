@@ -57,6 +57,9 @@ def main():
 
 
 def handleClientDisconnect(clientSock):
+    global names
+    if clientSock in names:
+        del names[clientSock]
     clientSocks.remove(clientSock)
     clientSock.close()
     exit()
@@ -120,8 +123,9 @@ def broadcastMessage(msg, excludeClient):
                 try:
                     sent = c.send(dataToSend[totalSent:])
                 except:
-                    print(f"{Fore.RED}Problem sending data to socket: {c}! Ignoring problem.{Fore.RESET}")
-                    continue
+                    print(f"{Fore.RED}Problem sending data to socket: {c}! Closing faulty client socket.{Fore.RESET}")
+                    handleClientDisconnect(c)
+                    break
                 
                 if sent == 0:
                     # socket closed on us.
