@@ -86,6 +86,11 @@ def handleClient(clientSock, clientAddr):
                 handleClientDisconnect(clientSock)
 
             fullMsg = msg.decode(FORMAT)
+            
+            # If the msg is empty:
+            if msg == b'\x00':
+                continue
+            
             while not fullMsg.find("\0"):
                 msg = clientSock.recv(bufferSize)
                 fullMsg += msg.decode(FORMAT)

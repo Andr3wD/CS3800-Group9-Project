@@ -7,7 +7,7 @@ import time
 from colorama import Fore
 
 # TODO change defaults
-ipDest = socket.gethostname()  # 'AWS' 52.53.221.224
+ipDest = socket.gethostname()
 portDest = 9999
 selfSock = None
 running = True
