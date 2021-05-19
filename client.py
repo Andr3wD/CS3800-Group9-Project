@@ -7,7 +7,7 @@ import time
 from colorama import Fore
 
 # TODO change defaults
-ipDest = socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
+ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com" #socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
 portDest = 9999
 selfSock = None
 running = True
@@ -81,13 +81,24 @@ def serverListener():
         if ready[0]:
             try:
                 msg = selfSock.recv(bufferSize)
+            except ssl.SSLWantReadError as e:
+                continue
             except:
+                print(f"{Fore.RED}Problem with listening to server! Shutting down!{Fore.RESET}")
                 selfSock.close()
                 exit()
                 
             fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
-                msg = selfSock.recv(bufferSize)
+                try:
+                    msg = selfSock.recv(bufferSize)
+                except ssl.SSLWantReadError as e:
+                    continue
+                except:
+                    print(f"{Fore.RED}Problem with listening to server! Shutting down!{Fore.RESET}")
+                    selfSock.close()
+                    exit()
+                    
                 fullMsg += msg.decode(FORMAT)
 
             if len(fullMsg) > 0:
