@@ -117,7 +117,12 @@ def broadcastMessage(msg, excludeClient):
             totalSent = 0
             dataToSend = bytes(msg + "\0", FORMAT)
             while totalSent < len(dataToSend):
-                sent = c.send(dataToSend[totalSent:])
+                try:
+                    sent = c.send(dataToSend[totalSent:])
+                except:
+                    print(f"{Fore.RED}Problem sending data to socket: {c}! Ignoring problem.{Fore.RESET}")
+                    continue
+                
                 if sent == 0:
                     # socket closed on us.
                     print(f"ERR: Socket closed on {c.getpeername()}!")
