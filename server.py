@@ -84,9 +84,12 @@ def handleClient(clientSock, clientAddr):
                 msg = clientSock.recv(bufferSize)
 
             except:
-                print(f"{Fore.RED}Client: {clientAddr} has closed their socket abruptly.{Fore.RESET}")
-                broadcastMessage(f"{Fore.YELLOW}{names.pop(clientSock)}{Fore.RESET} has been disconnected. We have {len(clientSocks)-1} client(s) in the room.", clientSock)
-                handleClientDisconnect(clientSock)
+                if clientSock.fileno() != -1:
+                    print(f"{Fore.RED}Client: {clientAddr} has closed their socket abruptly.{Fore.RESET}")
+                    broadcastMessage(f"{Fore.YELLOW}{names.pop(clientSock)}{Fore.RESET} has been disconnected. We have {len(clientSocks)-1} client(s) in the room.", clientSock)
+                    handleClientDisconnect(clientSock)
+                else:
+                    print(f"{Fore.CYAN}Client socket: {clientAddr} has been closed by server.{Fore.RESET}")
 
             fullMsg = msg.decode(FORMAT)
             
