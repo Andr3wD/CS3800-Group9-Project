@@ -28,8 +28,9 @@ def main():
     global ipHost
     global portHost
 
-    # TODO comment
+    # Setup SSLContext as TLS server.
     sslContext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # Give public and private keys to the SSLContext
     sslContext.load_cert_chain(certfile="./KEYS/server.public.pem", keyfile="./KEYS/server.private.key")
 
     # Create the socket with TCP and ipv4
@@ -51,7 +52,7 @@ def main():
         except:
             print(f"{Fore.RED}Forcing a quick shutdown!{Fore.RESET}")
             shutDown()
-        
+
         if x.strip().lower() == "exit" or x == "shutdown":
             shutDown()
 
@@ -92,15 +93,15 @@ def handleClient(clientSock, clientAddr):
                     print(f"{Fore.CYAN}Client socket: {clientAddr} has been closed by server.{Fore.RESET}")
 
             fullMsg = msg.decode(FORMAT)
-            
+
             # If the msg is empty:
             if msg == b'\x00':
                 continue
-            
+
             while not fullMsg.find("\0"):
                 msg = clientSock.recv(bufferSize)
                 fullMsg += msg.decode(FORMAT)
-            
+
             if len(fullMsg) > 0:
                 print(f"{names[clientSock]} said: {fullMsg}")
                 # Handle clients logging out with "logout()"
@@ -129,18 +130,19 @@ def broadcastMessage(msg, excludeClient):
                     print(f"{Fore.RED}Problem sending data to socket: {c}! Closing faulty client socket.{Fore.RESET}")
                     handleClientDisconnect(c)
                     break
-                
+
                 if sent == 0:
                     # socket closed on us.
                     print(f"ERR: Socket closed on {c.getpeername()}!")
                 totalSent += sent
+
     if messageDatabaseQueue.full():
         messageDatabaseQueue.get()
     messageDatabaseQueue.put(msg)  # Saving to message database
 
 
 def listen():
-    global running  # idk why this wants the global reference here...
+    global running
     global clientSocks
     global serverSock
     global threads

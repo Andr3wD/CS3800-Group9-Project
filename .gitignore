@@ -1,4 +1,11 @@
+### Development Environments and Hidden dot files
 .idea
-KEYS
-*.pem
+.vs_code
+.*
+
+### All keys
 *.key
+*.pem
+
+#### Allow server public key through
+!server.public.pem

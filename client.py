@@ -7,7 +7,7 @@ import time
 from colorama import Fore
 
 # TODO change defaults
-ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com" #socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
+ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com"  # socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
 portDest = 9999
 selfSock = None
 running = True
@@ -32,9 +32,6 @@ def main():
         # THIS IS ONLY FOR TESTING!
         print(f"{Fore.RED}Client only connecting to self. Ignoring cert validations.{Fore.RESET}")
         sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)  # Don't want to check hostname, since cert won't match right now.
-
-    # Probably just remove. client doesn't need cert.
-    # sslContext.load_cert_chain(certfile="./KEYS/client.public.pem", keyfile="./KEYS/client.private.key")
 
     # Setup socket as ipv4 and TCP.
     selfUnwrappedSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -87,7 +84,7 @@ def serverListener():
                 print(f"{Fore.RED}Problem with listening to server! Shutting down!{Fore.RESET}")
                 selfSock.close()
                 exit()
-                
+
             fullMsg = msg.decode(FORMAT)
             while not fullMsg.find("\0"):
                 try:
@@ -98,7 +95,7 @@ def serverListener():
                     print(f"{Fore.RED}Problem with listening to server! Shutting down!{Fore.RESET}")
                     selfSock.close()
                     exit()
-                    
+
                 fullMsg += msg.decode(FORMAT)
 
             if len(fullMsg) > 0:
@@ -115,14 +112,14 @@ def send(msg):
             sent = selfSock.send(dataToSend[totalSent:])
         except:
             exit()
-            
+
         if sent == 0:
             # socket closed on us.
             print("ERR: Socket closed! Shutting down.")
             shutDown()
         totalSent += sent
-        
-    if msg.strip().lower().replace(" ","") == "logout()":
+
+    if msg.strip().lower().replace(" ", "") == "logout()":
         shutDown()
 
 
@@ -130,9 +127,9 @@ def shutDown():
     global running
     global selfSock
     running = False
-    
+
     selfSock.close()  # Close socket to server
-    
+
     print("Goodbye!")
     exit()
 
