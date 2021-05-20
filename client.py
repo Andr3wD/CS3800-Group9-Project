@@ -6,8 +6,7 @@ import select
 import time
 from colorama import Fore
 
-# TODO change defaults
-ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com" # socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
+ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com" # socket.gethostname()
 portDest = 9999
 selfSock = None
 running = True
@@ -42,14 +41,14 @@ def main():
     # Connect to the server
     selfSock.connect((ipDest, portDest))
 
-    print(selfSock.getpeercert())
-
     print(f"Connected to {ipDest}, [REDACTED SERVER IP]")
 
     # Get and pring cipher details
     ciph = selfSock.cipher()
     if ciph[1] == "TLSv1.2" or ciph[1] == "TLSv1.3":
         print(f"Using cipher: {ciph[0]}, {Fore.GREEN}Protocol: {ciph[1]}{Fore.RESET}, #Secrets: {ciph[2]}.")
+    else:
+        print(f"Using cipher: {ciph[0]}, {Fore.RED}Protocol: {ciph[1]}{Fore.RESET}, #Secrets: {ciph[2]}.")
 
     # Start the serverListener method on a new thread.
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
