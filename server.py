@@ -40,7 +40,7 @@ def main():
     serverSock.bind((ipHost, portHost))
 
     # Start listening on the socket for connections
-    print("listening to port", portHost, " on ", ipHost, " using IP: ", socket.gethostbyname(ipHost))
+    print("listening to port", portHost, " on ", "[REDACTED]", " using IP: ", "[REDACTED]")
     serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
     thread1 = threading.Thread(target=listen, daemon=True)
@@ -71,7 +71,7 @@ def handleClient(clientSock, clientAddr):
     names[clientSock] = createName(clientSock)  # Get a name from the client
 
     # Print logging stuff for everyone.
-    print(f"{Fore.BLUE}{names[clientSock]}{Fore.RESET} has connected from {clientAddr}. We have {len(names)} client in the room.")
+    print(f"{Fore.BLUE}{names[clientSock]}{Fore.RESET} has connected from [REDACTED IP]. We have {len(names)} client in the room.")
     broadcastMessage(f"{Fore.BLUE}{names[clientSock]}{Fore.RESET} has connected to the server. We have {len(names)} client in the room.", clientSock)
     print(f"Updating {Fore.BLUE}{names[clientSock]}{Fore.RESET} with all previous messages in message database. We have {sendFullDatabase(clientSock)} messages.")
 
@@ -86,11 +86,11 @@ def handleClient(clientSock, clientAddr):
 
             except:
                 if clientSock.fileno() != -1:
-                    print(f"{Fore.RED}Client: {clientAddr} has closed their socket abruptly.{Fore.RESET}")
+                    print(f"{Fore.RED}Client: [REDACTED IP] has closed their socket abruptly.{Fore.RESET}")
                     broadcastMessage(f"{Fore.YELLOW}{names.pop(clientSock)}{Fore.RESET} has been disconnected. We have {len(clientSocks)-1} client(s) in the room.", clientSock)
                     handleClientDisconnect(clientSock)
                 else:
-                    print(f"{Fore.CYAN}Client socket: {clientAddr} has been closed by server.{Fore.RESET}")
+                    print(f"{Fore.CYAN}Client socket: [REDACTED IP] has been closed by server.{Fore.RESET}")
 
             fullMsg = msg.decode(FORMAT)
 
@@ -127,13 +127,13 @@ def broadcastMessage(msg, excludeClient):
                 try:
                     sent = c.send(dataToSend[totalSent:])
                 except:
-                    print(f"{Fore.RED}Problem sending data to socket: {c}! Closing faulty client socket.{Fore.RESET}")
+                    print(f"{Fore.RED}Problem sending data to socket: [REDACTED CLIENT]! Closing faulty client socket.{Fore.RESET}")
                     handleClientDisconnect(c)
                     break
 
                 if sent == 0:
                     # socket closed on us.
-                    print(f"ERR: Socket closed on {c.getpeername()}!")
+                    print(f"ERR: Socket closed on [REDACTED CLIENT]!")
                 totalSent += sent
 
     if messageDatabaseQueue.full():
@@ -171,7 +171,7 @@ def createName(clientSock):
     try:
         name = clientSock.recv(bufferSize)
     except:
-        print(f"{Fore.RED}Client: {clientSock.getpeername()} has disconnected before sending username.{Fore.RESET}")
+        print(f"{Fore.RED}Client: [REDACTED CLIENT] has disconnected before sending username.{Fore.RESET}")
         handleClientDisconnect(clientSock)
 
     return name.decode(FORMAT)

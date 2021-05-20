@@ -7,7 +7,7 @@ import time
 from colorama import Fore
 
 # TODO change defaults
-ipDest = "ec2-54-67-19-25.us-west-1.compute.amazonaws.com"  # socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
+ipDest = socket.gethostname()  # ec2-54-67-19-25.us-west-1.compute.amazonaws.com
 portDest = 9999
 selfSock = None
 running = True
@@ -44,7 +44,7 @@ def main():
 
     print(selfSock.getpeercert())
 
-    print(f"Connected to {ipDest}, {selfSock.getpeername()}")
+    print(f"Connected to {ipDest}, [REDACTED SERVER IP]")
 
     # Get and pring cipher details
     ciph = selfSock.cipher()
