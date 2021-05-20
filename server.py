@@ -7,7 +7,6 @@ import time
 from queue import Queue
 from colorama import Fore
 
-# TODO change defaults
 ipHost = socket.gethostname()
 portHost = 9999
 clientCapacity = 10
@@ -40,9 +39,10 @@ def main():
     serverSock.bind((ipHost, portHost))
 
     # Start listening on the socket for connections
-    print("listening to port", portHost, " on ", ipHost, " using IP: ", socket.gethostbyname(ipHost))
+    print("Listening to port", portHost, " on ", ipHost, " using IP: ", socket.gethostbyname(ipHost))
     serverSock.listen(clientCapacity)  # who knows. they could all connect at the same time?
 
+    # Start thread to listen for clients.
     thread1 = threading.Thread(target=listen, daemon=True)
     thread1.start()
 
