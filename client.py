@@ -42,14 +42,14 @@ def main():
     # Connect to the server
     selfSock.connect((ipDest, portDest))
 
-    print(selfSock.getpeercert())
-
     print(f"Connected to {ipDest}, {selfSock.getpeername()}")
 
     # Get and pring cipher details
     ciph = selfSock.cipher()
     if ciph[1] == "TLSv1.2" or ciph[1] == "TLSv1.3":
         print(f"Using cipher: {ciph[0]}, {Fore.GREEN}Protocol: {ciph[1]}{Fore.RESET}, #Secrets: {ciph[2]}.")
+    else:
+        print(f"Using cipher: {ciph[0]}, {Fore.RED}Protocol: {ciph[1]}{Fore.RESET}, #Secrets: {ciph[2]}.")
 
     # Start the serverListener method on a new thread.
     serverListenerThread = threading.Thread(target=serverListener, daemon=True)
